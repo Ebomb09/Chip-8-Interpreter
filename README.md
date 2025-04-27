@@ -16,7 +16,11 @@ directory.
 5. `cp "../ext/SDL3-3.2.10/x86_64-w64-mingw32/bin/SDL3.dll" "./SDL3.dll"`
 
 # Usage
-`./c8i program`
+```
+c8i [options] program
+        --scale <display scale> Sets the base pixel size of the original 64x32 screen
+        --clock <clock rate>    Sets the number of instructions completed per second
+```
 
 ### Controls:
 <table>

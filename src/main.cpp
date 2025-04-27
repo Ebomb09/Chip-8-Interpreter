@@ -6,41 +6,82 @@
 
 int main(int argc, char* argv[]) {
 
-    if(argc == 1) {
-        std::cout << "Usage: " << argv[0] << " file\n";
-        return 1;
+    // Program options
+    int opt_scale = 10;
+    int opt_clock = 1000;
+    bool opt_help = false;
+    int opt_program = -1;
 
-    }else if(argc <= 0) {
-        std::cerr << "Error: No command arguments passed to program!";
+    for(int i = 1; i < argc; i ++) {
+        std::string option = argv[i];
+        
+        if(option == "--help") {
+            opt_help = true;
+
+        }else if(option == "--scale") {
+            i ++;
+            if(i < argc) opt_scale = std::stoi(argv[i]);
+
+        }else if(option == "--clock") {
+            i ++;
+            if(i < argc) opt_clock = std::stoi(argv[i]);
+
+        }else {
+            opt_program = i;
+        }
+    }
+
+    if(opt_help || opt_program == -1) {
+        std::cout << "Usage: " << argv[0] << " [options] program\n";
+        std::cout << "\t--scale <display scale>\tSets the base pixel size of the original 64x32 screen\n";
+        std::cout << "\t--clock <clock rate>\tSets the number of instructions completed per second";
         return 1;
     }
 
+    // Initialize SDL
     if(!SDL_Init(SDL_INIT_VIDEO)) {
-        std::cerr << "Error: " << SDL_GetError();
+        std::cerr << "SDLError: " << SDL_GetError();
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("Chip-8 Interpreter", 640, 320, NULL);
+    SDL_Window* window = SDL_CreateWindow("Chip-8 Interpreter", chip8::DISPLAY_WIDTH * opt_scale, chip8::DISPLAY_HEIGHT * opt_scale, 0);
 
     if(!window) {
-        std::cerr << SDL_GetError();
+        std::cerr << "SDLError: " << SDL_GetError();
         return 1;
     }
 
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
 
     if(!renderer) {
-        std::cerr << SDL_GetError();
+        std::cerr << "SDLError: " << SDL_GetError();
         return 1;
     }
 
+    // Initialize the interpreter
     chip8 interp;
-    interp.init(argv[1]);
+
+    int success = interp.init(argv[opt_program]);
+    if(success != chip8::ERROR::NONE) {
+
+        switch(success) {
+
+        case chip8::ERROR::STD_FILE_NOT_FOUND:
+            std::cerr << "InitError: std/reserved.ch8 not found\n";
+            break;
+
+        case chip8::ERROR::PROGRAM_FILE_NOT_FOUND:
+            std::cerr << "InitError: " << argv[opt_program] << " not found\n";
+            break;
+        }
+
+        return 1;
+    }
 
     bool exit = false;
 
-    const int CLOCK_RATE = 1000; // Hz
-    const int DELAY_RATE = 60;  // Hz
+    const int CLOCK_RATE = opt_clock;   // Hz
+    const int DELAY_RATE = 60;          // Hz
 
     Uint64 clock = SDL_GetTicks();
     Uint64 delay = SDL_GetTicks();
@@ -49,12 +90,11 @@ int main(int argc, char* argv[]) {
 
         // Clock
         if(SDL_GetTicks() - clock >= 1000 / CLOCK_RATE) {
-            /*std::cout << std::hex << std::setfill('0') << std::setw(2);
-            std::cout << (int)interp.RAM[interp.PC];
-            std::cout << (int)interp.RAM[interp.PC+1];
-            std::cout << "\n";*/
-            interp.step();
 
+            if(interp.step() != chip8::ERROR::NONE) {
+                std::cerr << "RuntimeError: Illegal Instruction at: " << interp.PC << "\n";
+                exit = true;
+            }
             clock = SDL_GetTicks();
         }
 
@@ -65,17 +105,17 @@ int main(int argc, char* argv[]) {
             // Render pixels
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
-    
-            for(int i = 0; i < 64; i ++) {
-                for(int j = 0; j < 32; j ++) {
+
+            for(int i = 0; i < chip8::DISPLAY_WIDTH; i ++) {
+                for(int j = 0; j < chip8::DISPLAY_HEIGHT; j ++) {
     
                     if(interp.PIXEL[i][j] == 1) {
                         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
                         SDL_FRect dest {
-                            i * 10,
-                            j * 10,
-                            10,
-                            10
+                            (float)(i * opt_scale),
+                            (float)(j * opt_scale),
+                            (float)(opt_scale),
+                            (float)(opt_scale)
                         };
                         SDL_RenderFillRect(renderer, &dest);
                     }

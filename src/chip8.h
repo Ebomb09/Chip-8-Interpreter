@@ -25,7 +25,9 @@ struct chip8 {
     uint8 ST;
 
     // Display
-    uint8 PIXEL[64][32];
+    static const uint8 DISPLAY_WIDTH = 64;
+    static const uint8 DISPLAY_HEIGHT = 32;
+    uint8 PIXEL[DISPLAY_WIDTH][DISPLAY_HEIGHT];
 
     // Keyboard
     bool KEYBOARD[16];
@@ -33,10 +35,15 @@ struct chip8 {
     bool WAIT_FOR_KEY;
     bool WAIT_COMPLETE;
 
-    bool log = true;
+    enum ERROR {
+        NONE,
+        STD_FILE_NOT_FOUND,
+        PROGRAM_FILE_NOT_FOUND,
+        ILLEGAL_INSTRUCTION
+    };
 
-    void init(const char* program_file);
-    void step();
+    int init(const char* program_file);
+    int step();
     void timer();
 };
 
