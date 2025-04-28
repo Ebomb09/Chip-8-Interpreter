@@ -39,24 +39,39 @@ int main(int argc, char* argv[]) {
     }
 
     // Initialize SDL
-    if(!SDL_Init(SDL_INIT_VIDEO)) {
-        std::cerr << "SDLError: " << SDL_GetError();
+    if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+        std::cerr << "SDLInitError: " << SDL_GetError();
         return 1;
     }
 
     SDL_Window* window = SDL_CreateWindow("Chip-8 Interpreter", chip8::DISPLAY_WIDTH * opt_scale, chip8::DISPLAY_HEIGHT * opt_scale, 0);
-
     if(!window) {
-        std::cerr << "SDLError: " << SDL_GetError();
+        std::cerr << "SDLWindowError: " << SDL_GetError();
         return 1;
     }
 
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
-
     if(!renderer) {
-        std::cerr << "SDLError: " << SDL_GetError();
+        std::cerr << "SDLRendererError: " << SDL_GetError();
         return 1;
     }
+
+    // Load the tone sound effect
+    Uint8* audio_buffer;
+    Uint32 audio_length;
+    SDL_AudioSpec audio_spec;
+    if(!SDL_LoadWAV("std/tone.wav", &audio_spec, &audio_buffer, &audio_length)) {
+        std::cerr << "SDLAudioError: " << SDL_GetError();
+        return 1;
+    }
+
+    // Open an audio stream
+    SDL_AudioStream* audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, NULL, NULL);
+    if(audio_stream == NULL) {
+        std::cerr << "SDLAudioError: " << SDL_GetError();
+        return 1;
+    }
+    SDL_ResumeAudioStreamDevice(audio_stream);
 
     // Initialize the interpreter
     chip8 interp;
@@ -87,6 +102,11 @@ int main(int argc, char* argv[]) {
     Uint64 delay = SDL_GetTicks();
 
     while(!exit) {
+
+        // Play tone when SountTimer is active and no tone is played
+        if(interp.ST > 0 && SDL_GetAudioStreamAvailable(audio_stream) < (int)audio_length) {
+            SDL_PutAudioStreamData(audio_stream, audio_buffer, audio_length);
+        }
 
         // Clock
         if(SDL_GetTicks() - clock >= 1000 / CLOCK_RATE) {
@@ -181,6 +201,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    SDL_free(audio_buffer);
+    SDL_DestroyAudioStream(audio_stream);
     SDL_DestroyWindow(window);
     SDL_Quit();
 
